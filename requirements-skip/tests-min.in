@@ -1,4 +1,14 @@
-..[all]
+coveralls
+flake8
+pylint
+pytest
+pytest-cov
+
+psycopg2
+
+# --------------------------------------
+# Flask-Admin minimum supported versions
+# --------------------------------------
 
 flask==2.2.0
 werkzeug==2.3.8
