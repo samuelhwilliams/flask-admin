@@ -5,7 +5,7 @@ build:
     python: '3.11'
 python:
   install:
-    - requirements: requirements/docs.txt
+    - requirements: requirements/docs.txt .[all]
     - method: pip
       path: .
 sphinx:
