@@ -21,6 +21,10 @@ beautifulsoup4==4.12.3
     # via
     #   -r tests.in
     #   -r typing.txt
+blinker==1.8.2
+    # via
+    #   -r typing.txt
+    #   flask
 cachetools==5.4.0
     # via tox
 certifi==2024.7.4
@@ -37,6 +41,10 @@ charset-normalizer==3.3.2
     #   -r docs.txt
     #   -r typing.txt
     #   requests
+click==8.1.7
+    # via
+    #   -r typing.txt
+    #   flask
 colorama==0.4.6
     # via tox
 coverage[toml]==7.6.0
@@ -80,6 +88,14 @@ flake8==7.1.0
     #   -r docs.txt
     #   -r tests.in
     #   -r typing.txt
+flask==3.0.3
+    # via
+    #   -r typing.txt
+    #   flask-sqlalchemy
+flask-sqlalchemy==3.1.1
+    # via
+    #   -r tests.in
+    #   -r typing.txt
 identify==2.6.0
     # via pre-commit
 idna==3.7
@@ -94,6 +110,8 @@ imagesize==1.4.1
 importlib-metadata==8.2.0
     # via
     #   -r docs.txt
+    #   -r typing.txt
+    #   flask
     #   sphinx
 iniconfig==2.0.0
     # via
@@ -105,9 +123,15 @@ isort==5.13.2
     #   -r docs.txt
     #   -r typing.txt
     #   pylint
+itsdangerous==2.2.0
+    # via
+    #   -r typing.txt
+    #   flask
 jinja2==3.1.4
     # via
     #   -r docs.txt
+    #   -r typing.txt
+    #   flask
     #   sphinx
 markupsafe==2.1.5
     # via
@@ -115,6 +139,7 @@ markupsafe==2.1.5
     #   -r typing.txt
     #   jinja2
     #   types-wtforms
+    #   werkzeug
 mccabe==0.7.0
     # via
     #   -r docs.txt
@@ -252,6 +277,10 @@ sphinxcontrib-serializinghtml==1.1.5
     # via
     #   -r docs.txt
     #   sphinx
+sqlalchemy==2.0.32
+    # via
+    #   -r typing.txt
+    #   flask-sqlalchemy
 tomli==2.0.1
     # via
     #   -r docs.txt
@@ -316,6 +345,7 @@ typing-extensions==4.12.2
     #   astroid
     #   mypy
     #   pylint
+    #   sqlalchemy
 urllib3==2.2.2
     # via
     #   -r docs.txt
@@ -325,7 +355,12 @@ virtualenv==20.26.3
     # via
     #   pre-commit
     #   tox
-zipp==3.19.2
+werkzeug==3.0.3
+    # via
+    #   -r typing.txt
+    #   flask
+zipp==3.20.0
     # via
     #   -r docs.txt
+    #   -r typing.txt
     #   importlib-metadata

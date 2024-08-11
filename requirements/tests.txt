@@ -8,10 +8,14 @@ astroid==3.2.4
     # via pylint
 beautifulsoup4==4.12.3
     # via -r tests.in
+blinker==1.8.2
+    # via flask
 certifi==2024.7.4
     # via requests
 charset-normalizer==3.3.2
     # via requests
+click==8.1.7
+    # via flask
 coverage[toml]==7.6.0
     # via
     #   coveralls
@@ -26,12 +30,26 @@ exceptiongroup==1.2.2
     # via pytest
 flake8==7.1.0
     # via -r tests.in
+flask==3.0.3
+    # via flask-sqlalchemy
+flask-sqlalchemy==3.1.1
+    # via -r tests.in
 idna==3.7
     # via requests
+importlib-metadata==8.2.0
+    # via flask
 iniconfig==2.0.0
     # via pytest
 isort==5.13.2
     # via pylint
+itsdangerous==2.2.0
+    # via flask
+jinja2==3.1.4
+    # via flask
+markupsafe==2.1.5
+    # via
+    #   jinja2
+    #   werkzeug
 mccabe==0.7.0
     # via
     #   flake8
@@ -60,6 +78,8 @@ requests==2.32.3
     # via coveralls
 soupsieve==2.5
     # via beautifulsoup4
+sqlalchemy==2.0.32
+    # via flask-sqlalchemy
 tomli==2.0.1
     # via
     #   coverage
@@ -71,5 +91,10 @@ typing-extensions==4.12.2
     # via
     #   astroid
     #   pylint
+    #   sqlalchemy
 urllib3==2.2.2
     # via requests
+werkzeug==3.0.3
+    # via flask
+zipp==3.20.0
+    # via importlib-metadata

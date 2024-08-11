@@ -31,7 +31,6 @@ dependencies = [
 
 [project.optional-dependencies]
 sqlalchemy = [
-    "flask-sqlalchemy>=3",
     "sqlalchemy>=1.4",
 ]
 sqlalchemy-with-utils = [
