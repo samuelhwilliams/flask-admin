@@ -1,5 +1,6 @@
 #!/bin/sh
 pybabel extract -F babel.ini -k _gettext -k _ngettext -k lazy_gettext -o admin.pot --project Flask-Admin ../flask_admin
+pybabel update -i admin.pot -d ../flask_admin/translations -D admin -N
 pybabel compile -f -D admin -d ../flask_admin/translations/
 
 # docs
