@@ -1,18 +1,23 @@
 from dataclasses import dataclass
-import typing
 from functools import partial
+from typing import Protocol, Literal
 
 
-@dataclass
-class Theme:
+class Theme(Protocol):
     folder: str  # The templates folder name to use
     base_template: str
 
 
+class Bootstrap(Protocol):
+    swatch: str = 'default'
+    fluid: bool = False
+
+
 @dataclass
-class BootstrapTheme(Theme):
-    folder: typing.Literal['bootstrap4']
+class BootstrapTheme(Theme, Bootstrap):
+    folder: Literal['bootstrap4']
     base_template: str = 'admin/base.html'
+
     swatch: str = 'default'
     fluid: bool = False
 
