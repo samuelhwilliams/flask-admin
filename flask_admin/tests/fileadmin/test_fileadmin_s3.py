@@ -46,3 +46,108 @@ class TestS3FileAdmin(Base.FileAdminTests):
             self._test_storage,
             getenv("AWS_SECRET_ACCESS_KEY"),
         ), {}
+
+    def test_file_upload(self, app, admin):
+        fileadmin_class = self.fileadmin_class()
+        fileadmin_args, fileadmin_kwargs = self.fileadmin_args()
+
+        class MyFileAdmin(fileadmin_class):
+            editable_extensions = ("txt",)
+
+        view_kwargs = dict(fileadmin_kwargs)
+        view_kwargs.setdefault("name", "Files")
+        view = MyFileAdmin(*fileadmin_args, **view_kwargs)
+
+        admin.add_view(view)
+
+        client = app.test_client()
+
+        # upload
+        rv = client.get("/admin/myfileadmin/upload/")
+        assert rv.status_code == 200
+
+        rv = client.post(
+            "/admin/myfileadmin/upload/",
+            data=dict(upload=(BytesIO(b"test content"), "test_upload.txt")),
+        )
+        assert rv.status_code == 302
+
+        rv = client.get("/admin/myfileadmin/")
+        assert rv.status_code == 200
+        assert "path=test_upload.txt" in rv.data.decode("utf-8")
+
+    def test_file_download(self, app, admin):
+        fileadmin_class = self.fileadmin_class()
+        fileadmin_args, fileadmin_kwargs = self.fileadmin_args()
+
+        class MyFileAdmin(fileadmin_class):
+            editable_extensions = ("txt",)
+
+        view_kwargs = dict(fileadmin_kwargs)
+        view_kwargs.setdefault("name", "Files")
+        view = MyFileAdmin(*fileadmin_args, **view_kwargs)
+
+        admin.add_view(view)
+
+        client = app.test_client()
+
+        # download
+        rv = client.get("/admin/myfileadmin/download/?path=dummy.txt")
+        assert rv.status_code == 302
+        assert "dummy.txt" in rv.headers["Location"]
+
+    def test_file_rename(self, app, admin):
+        fileadmin_class = self.fileadmin_class()
+        fileadmin_args, fileadmin_kwargs = self.fileadmin_args()
+
+        class MyFileAdmin(fileadmin_class):
+            editable_extensions = ("txt",)
+
+        view_kwargs = dict(fileadmin_kwargs)
+        view_kwargs.setdefault("name", "Files")
+        view = MyFileAdmin(*fileadmin_args, **view_kwargs)
+
+        admin.add_view(view)
+
+        client = app.test_client()
+
+        # rename
+        rv = client.get("/admin/myfileadmin/rename/?path=dummy.txt")
+        assert rv.status_code == 200
+        assert "dummy.txt" in rv.data.decode("utf-8")
+
+        rv = client.post(
+            "/admin/myfileadmin/rename/?path=dummy.txt",
+            data=dict(name="dummy_renamed.txt", path="dummy.txt"),
+        )
+        assert rv.status_code == 302
+
+        rv = client.get("/admin/myfileadmin/")
+        assert rv.status_code == 200
+        assert "path=dummy_renamed.txt" in rv.data.decode("utf-8")
+        assert "path=dummy.txt" not in rv.data.decode("utf-8")
+
+    def test_file_delete(self, app, admin):
+        fileadmin_class = self.fileadmin_class()
+        fileadmin_args, fileadmin_kwargs = self.fileadmin_args()
+
+        class MyFileAdmin(fileadmin_class):
+            editable_extensions = ("txt",)
+
+        view_kwargs = dict(fileadmin_kwargs)
+        view_kwargs.setdefault("name", "Files")
+        view = MyFileAdmin(*fileadmin_args, **view_kwargs)
+
+        admin.add_view(view)
+
+        client = app.test_client()
+
+        # delete
+        rv = client.post(
+            "/admin/myfileadmin/delete/", data=dict(path="dummy.txt")
+        )
+        assert rv.status_code == 302
+
+        rv = client.get("/admin/myfileadmin/")
+        assert rv.status_code == 200
+        assert "path=dummy.txt" not in rv.data.decode("utf-8")
