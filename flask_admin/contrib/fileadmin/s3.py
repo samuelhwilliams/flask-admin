@@ -11,9 +11,7 @@ from . import BaseFileAdmin
 s3: Optional[ModuleType]
 
 try:
-    from boto import s3
-    from boto.s3.key import Key
-    from boto.s3.prefix import Prefix
+    import boto3
 except ImportError:
     s3 = None
 
@@ -57,16 +55,17 @@ class S3Storage:
 
         if not s3:
             raise ValueError(
-                "Could not import `boto`. "
+                "Could not import `boto3`. "
                 "Enable `s3` integration by installing `flask-admin[s3]`"
             )
 
-        connection = s3.connect_to_region(
-            region,
+        self.s3_client = boto3.client(
+            "s3",
+            region_name=region,
             aws_access_key_id=aws_access_key_id,
             aws_secret_access_key=aws_secret_access_key,
         )
-        self.bucket = connection.get_bucket(bucket_name)
+        self.bucket_name = bucket_name
         self.separator = "/"
 
     def get_files(self, path, directory):
@@ -86,17 +85,16 @@ class S3Storage:
         directories = []
         if path and not path.endswith(self.separator):
             path += self.separator
-        for key in self.bucket.list(path, self.separator):
-            if key.name == path:
-                continue
-            if isinstance(key, Prefix):
-                name = _remove_trailing_slash(_strip_path(key.name, path))
-                key_name = _remove_trailing_slash(key.name)
-                directories.append((name, key_name, True, 0, 0))
-            else:
-                last_modified = _iso_to_epoch(key.last_modified)
-                name = _strip_path(key.name, path)
-                files.append((name, key.name, False, key.size, last_modified))
+        response = self.s3_client.list_objects_v2(
+            Bucket=self.bucket_name, Prefix=path, Delimiter=self.separator
+        )
+        for content in response.get("Contents", []):
+            name = _strip_path(content["Key"], path)
+            last_modified = _iso_to_epoch(content["LastModified"].isoformat())
+            files.append((name, content["Key"], False, content["Size"], last_modified))
+        for prefix in response.get("CommonPrefixes", []):
+            name = _remove_trailing_slash(_strip_path(prefix["Prefix"], path))
+            directories.append((name, prefix["Prefix"], True, 0, 0))
         return directories + files
 
     def _get_bucket_list_prefix(self, path):
@@ -109,7 +107,10 @@ class S3Storage:
 
     def _get_path_keys(self, path):
         search = self._get_bucket_list_prefix(path)
-        return {key.name for key in self.bucket.list(search, self.separator)}
+        response = self.s3_client.list_objects_v2(
+            Bucket=self.bucket_name, Prefix=search, Delimiter=self.separator
+        )
+        return {content["Key"] for content in response.get("Contents", [])}
 
     def is_dir(self, path):
         keys = self._get_path_keys(path)
@@ -133,29 +134,31 @@ class S3Storage:
         return breadcrumbs
 
     def send_file(self, file_path):
-        key = self.bucket.get_key(file_path)
-        if key is None:
-            raise ValueError()
-        return redirect(key.generate_url(3600))
+        url = self.s3_client.generate_presigned_url(
+            "get_object",
+            Params={"Bucket": self.bucket_name, "Key": file_path},
+            ExpiresIn=3600,
+        )
+        return redirect(url)
 
     def save_file(self, path, file_data):
-        key = Key(self.bucket, path)
-        headers = {
-            "Content-Type": file_data.content_type,
-        }
-        key.set_contents_from_file(file_data.stream, headers=headers)
+        self.s3_client.put_object(
+            Bucket=self.bucket_name,
+            Key=path,
+            Body=file_data.stream,
+            ContentType=file_data.content_type,
+        )
 
     def delete_tree(self, directory):
         self._check_empty_directory(directory)
-        self.bucket.delete_key(directory + self.separator)
+        self.s3_client.delete_object(Bucket=self.bucket_name, Key=directory + self.separator)
 
     def delete_file(self, file_path):
-        self.bucket.delete_key(file_path)
+        self.s3_client.delete_object(Bucket=self.bucket_name, Key=file_path)
 
     def make_dir(self, path, directory):
         dir_path = self.separator.join([path, (directory + self.separator)])
-        key = Key(self.bucket, dir_path)
-        key.set_contents_from_string("")
+        self.s3_client.put_object(Bucket=self.bucket_name, Key=dir_path, Body="")
 
     def _check_empty_directory(self, path):
         if not self._is_directory_empty(path):
@@ -167,7 +170,8 @@ class S3Storage:
             self._check_empty_directory(src)
             src += self.separator
             dst += self.separator
-        self.bucket.copy_key(dst, self.bucket.name, src)
+        copy_source = {"Bucket": self.bucket_name, "Key": src}
+        self.s3_client.copy_object(CopySource=copy_source, Bucket=self.bucket_name, Key=dst)
         self.delete_file(src)
 
     def _is_directory_empty(self, path):
@@ -175,12 +179,11 @@ class S3Storage:
         return len(keys) == 1
 
     def read_file(self, path):
-        key = Key(self.bucket, path)
-        return key.get_contents_as_string()
+        response = self.s3_client.get_object(Bucket=self.bucket_name, Key=path)
+        return response["Body"].read()
 
     def write_file(self, path, content):
-        key = Key(self.bucket, path)
-        key.set_contents_from_file(content)
+        self.s3_client.put_object(Bucket=self.bucket_name, Key=path, Body=content)
 
 
 class S3FileAdmin(BaseFileAdmin):
