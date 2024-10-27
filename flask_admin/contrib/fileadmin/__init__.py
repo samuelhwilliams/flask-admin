@@ -5,9 +5,11 @@ import re
 import shutil
 import sys
 import warnings
+from collections.abc import Sequence
 from datetime import datetime
 from functools import partial
 from operator import itemgetter
+from typing import Optional
 from urllib.parse import quote
 from urllib.parse import urljoin
 
@@ -16,6 +18,7 @@ from flask import flash
 from flask import redirect
 from flask import request
 from flask import send_file
+from werkzeug.datastructures.file_storage import FileStorage
 from werkzeug.utils import secure_filename
 from wtforms import fields
 from wtforms import validators
@@ -29,6 +32,7 @@ from flask_admin.babel import gettext
 from flask_admin.babel import lazy_gettext
 from flask_admin.base import BaseView
 from flask_admin.base import expose
+from flask_admin.contrib.fileadmin.storage import IStorage
 
 if sys.version_info >= (3, 11):
     from datetime import UTC
@@ -39,7 +43,7 @@ else:
 
 
 class LocalFileStorage:
-    def __init__(self, base_path):
+    def __init__(self, base_path: str):
         """
         Constructor.
 
@@ -62,13 +66,13 @@ class LocalFileStorage:
         """
         return op.normpath(self.base_path)
 
-    def make_dir(self, path, directory):
+    def make_dir(self, path: str, directory: str):
         """
         Creates a directory `directory` under the `path`
         """
         os.mkdir(op.join(path, directory))
 
-    def get_files(self, path, directory):
+    def get_files(self, path: str, directory: str):
         """
         Gets a list of tuples representing the files in the `directory`
         under the `path`
@@ -93,57 +97,57 @@ class LocalFileStorage:
             items.append((f, rel_path, is_dir, size, last_modified))
         return items
 
-    def delete_tree(self, directory):
+    def delete_tree(self, directory: str):
         """
         Deletes the directory `directory` and all its files and subdirectories
         """
         shutil.rmtree(directory)
 
-    def delete_file(self, file_path):
+    def delete_file(self, file_path: str):
         """
         Deletes the file located at `file_path`
         """
         os.remove(file_path)
 
-    def path_exists(self, path):
+    def path_exists(self, path: str):
         """
         Check if `path` exists
         """
         return op.exists(path)
 
-    def rename_path(self, src, dst):
+    def rename_path(self, src: str, dst: str):
         """
         Renames `src` to `dst`
         """
         os.rename(src, dst)
 
-    def is_dir(self, path):
+    def is_dir(self, path: str):
         """
         Check if `path` is a directory
         """
         return op.isdir(path)
 
-    def send_file(self, file_path):
+    def send_file(self, file_path: str):
         """
         Sends the file located at `file_path` to the user
         """
         return send_file(file_path)
 
-    def read_file(self, path):
+    def read_file(self, path: str):
         """
         Reads the content of the file located at `file_path`.
         """
         with open(path, "rb") as f:
             return f.read()
 
-    def write_file(self, path, content):
+    def write_file(self, path: str, content: str):
         """
         Writes `content` to the file located at `file_path`.
         """
         with open(path, "w") as f:
             return f.write(content)
 
-    def save_file(self, path, file_data):
+    def save_file(self, path: str, file_data: FileStorage):
         """
         Save uploaded file to the disk
 
@@ -156,37 +160,37 @@ class LocalFileStorage:
 
 
 class BaseFileAdmin(BaseView, ActionsMixin):
-    can_upload = True
+    can_upload: bool = True
     """
         Is file upload allowed.
     """
 
-    can_download = True
+    can_download: bool = True
     """
         Is file download allowed.
     """
 
-    can_delete = True
+    can_delete: bool = True
     """
         Is file deletion allowed.
     """
 
-    can_delete_dirs = True
+    can_delete_dirs: bool = True
     """
         Is recursive directory deletion is allowed.
     """
 
-    can_mkdir = True
+    can_mkdir: bool = True
     """
         Is directory creation allowed.
     """
 
-    can_rename = True
+    can_rename: bool = True
     """
         Is file and directory renaming allowed.
     """
 
-    allowed_extensions = None
+    allowed_extensions: Optional[set[str]] = None
     """
         List of allowed extensions for uploads, in lower case.
 
@@ -196,7 +200,7 @@ class BaseFileAdmin(BaseView, ActionsMixin):
                 allowed_extensions = ('swf', 'jpg', 'gif', 'png')
     """
 
-    editable_extensions: tuple = tuple()
+    editable_extensions: set[str] = set()
     """
         List of editable extensions, in lower case.
 
@@ -206,52 +210,52 @@ class BaseFileAdmin(BaseView, ActionsMixin):
                 editable_extensions = ('md', 'html', 'txt')
     """
 
-    list_template = "admin/file/list.html"
+    list_template: str = "admin/file/list.html"
     """
         File list template
     """
 
-    upload_template = "admin/file/form.html"
+    upload_template: str = "admin/file/form.html"
     """
         File upload template
     """
 
-    upload_modal_template = "admin/file/modals/form.html"
+    upload_modal_template: str = "admin/file/modals/form.html"
     """
         File upload template for modal dialog
     """
 
-    mkdir_template = "admin/file/form.html"
+    mkdir_template: str = "admin/file/form.html"
     """
         Directory creation (mkdir) template
     """
 
-    mkdir_modal_template = "admin/file/modals/form.html"
+    mkdir_modal_template: str = "admin/file/modals/form.html"
     """
         Directory creation (mkdir) template for modal dialog
     """
 
-    rename_template = "admin/file/form.html"
+    rename_template: str = "admin/file/form.html"
     """
         Rename template
     """
 
-    rename_modal_template = "admin/file/modals/form.html"
+    rename_modal_template: str = "admin/file/modals/form.html"
     """
         Rename template for modal dialog
     """
 
-    edit_template = "admin/file/form.html"
+    edit_template: str = "admin/file/form.html"
     """
         Edit template
     """
 
-    edit_modal_template = "admin/file/modals/form.html"
+    edit_modal_template: str = "admin/file/modals/form.html"
     """
         Edit template for modal dialog
     """
 
-    form_base_class = form.BaseForm
+    form_base_class: type[form.BaseForm] = form.BaseForm
     """
         Base form class. Will be used to create the upload, rename, edit, and delete
         form.
@@ -271,52 +275,54 @@ class BaseFileAdmin(BaseView, ActionsMixin):
     """
 
     # Modals
-    rename_modal = False
+    rename_modal: bool = False
     """Setting this to true will display the rename view as a modal dialog."""
 
-    upload_modal = False
+    upload_modal: bool = False
     """Setting this to true will display the upload view as a modal dialog."""
 
-    mkdir_modal = False
+    mkdir_modal: bool = False
     """Setting this to true will display the mkdir view as a modal dialog."""
 
-    edit_modal = False
+    edit_modal: bool = False
     """Setting this to true will display the edit view as a modal dialog."""
 
     # List view
-    possible_columns = "name", "rel_path", "is_dir", "size", "date"
+    possible_columns: Sequence[str] = ("name", "rel_path", "is_dir", "size", "date")
     """A list of possible columns to display."""
 
-    column_list = "name", "size", "date"
+    column_list: Sequence[str] = ("name", "size", "date")
     """A list of columns to display."""
 
-    column_sortable_list = column_list
+    column_sortable_list: Sequence[str] = column_list
     """A list of sortable columns."""
 
-    default_sort_column = None
+    default_sort_column: Optional[str] = None
     """The default sort column."""
 
-    default_desc = 0
+    default_desc: int = 0
     """The default desc value."""
 
-    column_labels = dict((column, column.capitalize()) for column in column_list)
+    column_labels: dict[str, str] = dict(
+        (column, column.capitalize()) for column in column_list
+    )
     """A dict from column names to their labels."""
 
-    date_format = "%Y-%m-%d %H:%M:%S"
+    date_format: str = "%Y-%m-%d %H:%M:%S"
     """Date column display format."""
 
     def __init__(
         self,
-        base_url=None,
-        name=None,
-        category=None,
-        endpoint=None,
-        url=None,
-        verify_path=True,
-        menu_class_name=None,
-        menu_icon_type=None,
-        menu_icon_value=None,
-        storage=None,
+        base_url: Optional[str] = None,
+        name: Optional[str] = None,
+        category: Optional[str] = None,
+        endpoint: Optional[str] = None,
+        url: Optional[str] = None,
+        verify_path: bool = True,
+        menu_class_name: Optional[str] = None,
+        menu_icon_type: Optional[str] = None,
+        menu_icon_value: Optional[str] = None,
+        storage: Optional[IStorage] = None,
     ):
         """
         Constructor.

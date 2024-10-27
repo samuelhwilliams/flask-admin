@@ -71,7 +71,6 @@ class S3Storage:
 
         self.s3_client = s3_client
         self.bucket_name = bucket_name
-        self.separator = "/"
 
     @_strip_leading_slash_from("path")
     def get_files(self, path, directory):
