@@ -5,9 +5,13 @@ from flask_admin import Admin
 
 
 @pytest.fixture
-def db():
+def db(app):
     db = peewee.SqliteDatabase(":memory:")
+
     yield db
+
+    with app.app_context():
+        db.close()
 
 
 @pytest.fixture
