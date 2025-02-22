@@ -1,5 +1,8 @@
 from datetime import datetime
 
+from mongoengine import StringField, Document, EmbeddedDocument, ReferenceField, \
+    IntField, FloatField, BooleanField, DateField, DateTimeField, ListField, \
+    EmbeddedDocumentField, SortedListField
 from wtforms import fields
 from wtforms import validators
 
@@ -18,25 +21,25 @@ class CustomModelView(ModelView):
         super().__init__(model, name, category, endpoint, url)
 
 
-def create_models(db):
-    class Model1(db.Document):
-        test1 = db.StringField(max_length=20)
-        test2 = db.StringField(max_length=20)
-        test3 = db.StringField()
-        test4 = db.StringField()
-        date_field = db.DateField()
-        datetime_field = db.DateTimeField()
+def create_models():
+    class Model1(Document):
+        test1 = StringField(max_length=20)
+        test2 = StringField(max_length=20)
+        test3 = StringField()
+        test4 = StringField()
+        date_field = DateField()
+        datetime_field = DateTimeField()
 
         def __str__(self):
             return self.test1
 
-    class Model2(db.Document):
-        string_field = db.StringField()
-        int_field = db.IntField()
-        float_field = db.FloatField()
-        bool_field = db.BooleanField()
+    class Model2(Document):
+        string_field = StringField()
+        int_field = IntField()
+        float_field = FloatField()
+        bool_field = BooleanField()
 
-        model1 = db.ReferenceField(Model1)
+        model1 = ReferenceField(Model1)
 
     Model1.objects.delete()
     Model2.objects.delete()
@@ -71,8 +74,8 @@ def fill_db(Model1, Model2):
     Model1(test1="datetime_obj2", datetime_field=datetime(2013, 3, 2, 0, 8, 0)).save()
 
 
-def test_model(app, db, admin):
-    Model1, Model2 = create_models(db)
+def test_model(app, admin):
+    Model1, Model2 = create_models()
 
     view = CustomModelView(Model1)
     admin.add_view(view)
@@ -141,8 +144,8 @@ def test_model(app, db, admin):
     assert Model1.objects.count() == 0
 
 
-def test_column_editable_list(app, db, admin):
-    Model1, Model2 = create_models(db)
+def test_column_editable_list(app, admin):
+    Model1, Model2 = create_models()
 
     view = CustomModelView(Model1, column_editable_list=["test1", "datetime_field"])
     admin.add_view(view)
@@ -227,8 +230,8 @@ def test_column_editable_list(app, db, admin):
     assert "test1_val_1" in data
 
 
-def test_details_view(app, db, admin):
-    Model1, Model2 = create_models(db)
+def test_details_view(app, admin):
+    Model1, Model2 = create_models()
 
     view_no_details = CustomModelView(Model1)
     admin.add_view(view_no_details)
@@ -285,8 +288,8 @@ def test_details_view(app, db, admin):
     assert "Int Field" not in data
 
 
-def test_column_filters(app, db, admin):
-    Model1, Model2 = create_models(db)
+def test_column_filters(app, admin):
+    Model1, Model2 = create_models()
 
     # fill DB with values
     fill_db(Model1, Model2)
@@ -690,8 +693,8 @@ def test_column_filters(app, db, admin):
     assert "datetime_obj2" in data
 
 
-def test_default_sort(app, db, admin):
-    M1, _ = create_models(db)
+def test_default_sort(app, admin):
+    M1, _ = create_models()
 
     M1(test1="c", test2="x").save()
     M1(test1="b", test2="x").save()
@@ -721,8 +724,8 @@ def test_default_sort(app, db, admin):
     assert data[2].test1 == "a"
 
 
-def test_extra_fields(app, db, admin):
-    Model1, _ = create_models(db)
+def test_extra_fields(app, admin):
+    Model1, _ = create_models()
 
     view = CustomModelView(
         Model1, form_extra_fields={"extra_field": fields.StringField("Extra Field")}
@@ -742,8 +745,8 @@ def test_extra_fields(app, db, admin):
     assert pos2 < pos1
 
 
-def test_extra_field_order(app, db, admin):
-    Model1, _ = create_models(db)
+def test_extra_field_order(app, admin):
+    Model1, _ = create_models()
 
     view = CustomModelView(
         Model1, form_extra_fields={"extra_field": fields.StringField("Extra Field")}
@@ -763,11 +766,11 @@ def test_extra_field_order(app, db, admin):
     assert pos2 < pos1
 
 
-def test_custom_form_base(app, db, admin):
+def test_custom_form_base(app, admin):
     class TestForm(form.BaseForm):
         pass
 
-    Model1, _ = create_models(db)
+    Model1, _ = create_models()
 
     view = CustomModelView(Model1, form_base_class=TestForm)
     admin.add_view(view)
@@ -778,14 +781,14 @@ def test_custom_form_base(app, db, admin):
     assert isinstance(create_form, TestForm)
 
 
-def test_subdocument_config(app, db, admin):
-    class Comment(db.EmbeddedDocument):
-        name = db.StringField(max_length=20, required=True)
-        value = db.StringField(max_length=20)
+def test_subdocument_config(app, admin):
+    class Comment(EmbeddedDocument):
+        name = StringField(max_length=20, required=True)
+        value = StringField(max_length=20)
 
-    class Model1(db.Document):
-        test1 = db.StringField(max_length=20)
-        subdoc = db.EmbeddedDocumentField(Comment)
+    class Model1(Document):
+        test1 = StringField(max_length=20)
+        subdoc = EmbeddedDocumentField(Comment)
 
     # Check only
     view1 = CustomModelView(
@@ -808,16 +811,16 @@ def test_subdocument_config(app, db, admin):
     assert "value" not in dir(form.subdoc.form)
 
 
-def test_subdocument_class_config(app, db, admin):
+def test_subdocument_class_config(app, admin):
     from flask_admin.contrib.mongoengine import EmbeddedForm
 
-    class Comment(db.EmbeddedDocument):
-        name = db.StringField(max_length=20, required=True)
-        value = db.StringField(max_length=20)
+    class Comment(EmbeddedDocument):
+        name = StringField(max_length=20, required=True)
+        value = StringField(max_length=20)
 
-    class Model1(db.Document):
-        test1 = db.StringField(max_length=20)
-        subdoc = db.EmbeddedDocumentField(Comment)
+    class Model1(Document):
+        test1 = StringField(max_length=20)
+        subdoc = EmbeddedDocumentField(Comment)
 
     class EmbeddedConfig(EmbeddedForm):
         form_columns = ("name",)
@@ -830,19 +833,19 @@ def test_subdocument_class_config(app, db, admin):
     assert "value" not in dir(form.subdoc.form)
 
 
-def test_nested_subdocument_config(app, db, admin):
+def test_nested_subdocument_config(app, admin):
     # Check recursive
-    class Comment(db.EmbeddedDocument):
-        name = db.StringField(max_length=20, required=True)
-        value = db.StringField(max_length=20)
+    class Comment(EmbeddedDocument):
+        name = StringField(max_length=20, required=True)
+        value = StringField(max_length=20)
 
-    class Nested(db.EmbeddedDocument):
-        name = db.StringField(max_length=20, required=True)
-        comment = db.EmbeddedDocumentField(Comment)
+    class Nested(EmbeddedDocument):
+        name = StringField(max_length=20, required=True)
+        comment = EmbeddedDocumentField(Comment)
 
-    class Model1(db.Document):
-        test1 = db.StringField(max_length=20)
-        nested = db.EmbeddedDocumentField(Nested)
+    class Model1(Document):
+        test1 = StringField(max_length=20)
+        nested = EmbeddedDocumentField(Nested)
 
     view1 = CustomModelView(
         Model1,
@@ -856,38 +859,14 @@ def test_nested_subdocument_config(app, db, admin):
     assert "value" not in dir(form.nested.form.comment.form)
 
 
-def test_nested_list_subdocument(app, db, admin):
-    class Comment(db.EmbeddedDocument):
-        name = db.StringField(max_length=20, required=True)
-        value = db.StringField(max_length=20)
+def test_nested_list_subdocument(app, admin):
+    class Comment(EmbeddedDocument):
+        name = StringField(max_length=20, required=True)
+        value = StringField(max_length=20)
 
-    class Model1(db.Document):
-        test1 = db.StringField(max_length=20)
-        subdoc = db.ListField(db.EmbeddedDocumentField(Comment))
-
-    # Check only
-    view1 = CustomModelView(
-        Model1,
-        form_subdocuments={
-            "subdoc": {"form_subdocuments": {None: {"form_columns": ("name",)}}}
-        },
-    )
-
-    form = view1.create_form()
-    inline_form = form.subdoc.unbound_field.args[2]
-
-    assert "name" in dir(inline_form)
-    assert "value" not in dir(inline_form)
-
-
-def test_nested_sortedlist_subdocument(app, db, admin):
-    class Comment(db.EmbeddedDocument):
-        name = db.StringField(max_length=20, required=True)
-        value = db.StringField(max_length=20)
-
-    class Model1(db.Document):
-        test1 = db.StringField(max_length=20)
-        subdoc = db.SortedListField(db.EmbeddedDocumentField(Comment))
+    class Model1(Document):
+        test1 = StringField(max_length=20)
+        subdoc = ListField(EmbeddedDocumentField(Comment))
 
     # Check only
     view1 = CustomModelView(
@@ -904,14 +883,38 @@ def test_nested_sortedlist_subdocument(app, db, admin):
     assert "value" not in dir(inline_form)
 
 
-def test_sortedlist_subdocument_validation(app, db, admin):
-    class Comment(db.EmbeddedDocument):
-        name = db.StringField(max_length=20, required=True)
-        value = db.StringField(max_length=20)
+def test_nested_sortedlist_subdocument(app, admin):
+    class Comment(EmbeddedDocument):
+        name = StringField(max_length=20, required=True)
+        value = StringField(max_length=20)
 
-    class Model1(db.Document):
-        test1 = db.StringField(max_length=20)
-        subdoc = db.SortedListField(db.EmbeddedDocumentField(Comment))
+    class Model1(Document):
+        test1 = StringField(max_length=20)
+        subdoc = SortedListField(EmbeddedDocumentField(Comment))
+
+    # Check only
+    view1 = CustomModelView(
+        Model1,
+        form_subdocuments={
+            "subdoc": {"form_subdocuments": {None: {"form_columns": ("name",)}}}
+        },
+    )
+
+    form = view1.create_form()
+    inline_form = form.subdoc.unbound_field.args[2]
+
+    assert "name" in dir(inline_form)
+    assert "value" not in dir(inline_form)
+
+
+def test_sortedlist_subdocument_validation(app, admin):
+    class Comment(EmbeddedDocument):
+        name = StringField(max_length=20, required=True)
+        value = StringField(max_length=20)
+
+    class Model1(Document):
+        test1 = StringField(max_length=20)
+        subdoc = SortedListField(EmbeddedDocumentField(Comment))
 
     view = CustomModelView(Model1)
     admin.add_view(view)
@@ -935,14 +938,14 @@ def test_sortedlist_subdocument_validation(app, db, admin):
     assert b"This field is required" in rv.data
 
 
-def test_list_subdocument_validation(app, db, admin):
-    class Comment(db.EmbeddedDocument):
-        name = db.StringField(max_length=20, required=True)
-        value = db.StringField(max_length=20)
+def test_list_subdocument_validation(app, admin):
+    class Comment(EmbeddedDocument):
+        name = StringField(max_length=20, required=True)
+        value = StringField(max_length=20)
 
-    class Model1(db.Document):
-        test1 = db.StringField(max_length=20)
-        subdoc = db.ListField(db.EmbeddedDocumentField(Comment))
+    class Model1(Document):
+        test1 = StringField(max_length=20)
+        subdoc = ListField(EmbeddedDocumentField(Comment))
 
     view = CustomModelView(Model1)
     admin.add_view(view)
@@ -966,8 +969,8 @@ def test_list_subdocument_validation(app, db, admin):
     assert b"This field is required" in rv.data
 
 
-def test_ajax_fk(app, db, admin):
-    Model1, Model2 = create_models(db)
+def test_ajax_fk(app, admin):
+    Model1, Model2 = create_models()
 
     view = CustomModelView(
         Model2, url="view", form_ajax_refs={"model1": {"fields": ("test1", "test2")}}
@@ -1025,19 +1028,19 @@ def test_ajax_fk(app, db, admin):
     assert mdl.model1.test1 == "first"
 
 
-def test_nested_ajax_refs(app, db, admin):
+def test_nested_ajax_refs(app, admin):
     # Check recursive
-    class Comment(db.Document):
-        name = db.StringField(max_length=20, required=True)
-        value = db.StringField(max_length=20)
+    class Comment(Document):
+        name = StringField(max_length=20, required=True)
+        value = StringField(max_length=20)
 
-    class Nested(db.EmbeddedDocument):
-        name = db.StringField(max_length=20, required=True)
-        comment = db.ReferenceField(Comment)
+    class Nested(EmbeddedDocument):
+        name = StringField(max_length=20, required=True)
+        comment = ReferenceField(Comment)
 
-    class Model1(db.Document):
-        test1 = db.StringField(max_length=20)
-        nested = db.EmbeddedDocumentField(Nested)
+    class Model1(Document):
+        test1 = StringField(max_length=20)
+        nested = EmbeddedDocumentField(Nested)
 
     view1 = CustomModelView(
         Model1,
@@ -1051,9 +1054,9 @@ def test_nested_ajax_refs(app, db, admin):
     assert "nested-comment" in view1._form_ajax_refs
 
 
-def test_form_flat_choices(app, db, admin):
-    class Model(db.Document):
-        name = db.StringField(max_length=20, choices=("a", "b", "c"))
+def test_form_flat_choices(app, admin):
+    class Model(Document):
+        name = StringField(max_length=20, choices=("a", "b", "c"))
 
     view = CustomModelView(Model)
     admin.add_view(view)
@@ -1062,9 +1065,9 @@ def test_form_flat_choices(app, db, admin):
     assert form.name.choices == [("a", "a"), ("b", "b"), ("c", "c")]
 
 
-def test_form_args(app, db, admin):
-    class Model(db.Document):
-        test = db.StringField(required=True)
+def test_form_args(app, admin):
+    class Model(Document):
+        test = StringField(required=True)
 
     shared_form_args = {"test": {"validators": [validators.Regexp("test")]}}
 
@@ -1079,14 +1082,14 @@ def test_form_args(app, db, admin):
     assert len(edit_form.test.validators) == 2
 
 
-def test_form_args_embeddeddoc(app, db, admin):
-    class Info(db.EmbeddedDocument):
-        name = db.StringField()
-        age = db.StringField()
+def test_form_args_embeddeddoc(app, admin):
+    class Info(EmbeddedDocument):
+        name = StringField()
+        age = StringField()
 
-    class Model(db.Document):
-        info = db.EmbeddedDocumentField("Info")
-        timestamp = db.DateTimeField()
+    class Model(Document):
+        info = EmbeddedDocumentField("Info")
+        timestamp = DateTimeField()
 
     view = CustomModelView(
         Model,
@@ -1102,8 +1105,8 @@ def test_form_args_embeddeddoc(app, db, admin):
     assert form.info.label.text == "Information"
 
 
-def test_simple_list_pager(app, db, admin):
-    Model1, _ = create_models(db)
+def test_simple_list_pager(app, admin):
+    Model1, _ = create_models()
 
     class TestModelView(CustomModelView):
         simple_list_pager = True
@@ -1118,9 +1121,9 @@ def test_simple_list_pager(app, db, admin):
     assert count is None
 
 
-def test_customising_page_size(app, db, admin):
+def test_customising_page_size(app, admin):
     with app.app_context():
-        M1, _ = create_models(db)
+        M1, _ = create_models()
 
         instances = [M1(test1=f"instance-{x+1:03d}") for x in range(101)]
         for instance in instances:
@@ -1132,18 +1135,17 @@ def test_customising_page_size(app, db, admin):
         admin.add_view(view1)
 
         view2 = CustomModelView(
-            M1, db, endpoint="view2", page_size=5, can_set_page_size=False
+            M1, endpoint="view2", page_size=5, can_set_page_size=False
         )
         admin.add_view(view2)
 
         view3 = CustomModelView(
-            M1, db, endpoint="view3", page_size=20, can_set_page_size=True
+            M1, endpoint="view3", page_size=20, can_set_page_size=True
         )
         admin.add_view(view3)
 
         view4 = CustomModelView(
             M1,
-            db,
             endpoint="view4",
             page_size=5,
             page_size_options=(5, 10, 15),
@@ -1204,8 +1206,8 @@ def test_customising_page_size(app, db, admin):
         assert "instance-016" not in rv.text
 
 
-def test_export_csv(app, db, admin):
-    Model1, Model2 = create_models(db)
+def test_export_csv(app, admin):
+    Model1, Model2 = create_models()
 
     view1 = CustomModelView(
         Model1,
