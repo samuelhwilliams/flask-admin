@@ -1,9 +1,9 @@
 # flake8: noqa
 try:
-    import flask_mongoengine
+    import mongoengine
 except ImportError:
     raise Exception(
-        'Could not import `flask-mongoengine`. '
+        'Could not import `mongoengine`. '
         'Enable `mongoengine` integration by installing `flask-admin[mongoengine]`'
     )
 

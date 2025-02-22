@@ -456,11 +456,7 @@ def get_form(model, converter,
              field_args=None,
              extra_fields=None):
     """
-    Create a wtforms Form for a given mongoengine Document schema::
-
-        from flask_mongoengine.wtf import model_form
-        from myproject.myapp.schemas import Article
-        ArticleForm = model_form(Article)
+    Create a wtforms Form for a given mongoengine Document schema
 
     :param model:
         A mongoengine Document schema class
