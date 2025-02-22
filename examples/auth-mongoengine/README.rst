@@ -19,5 +19,3 @@ To run this example:
 4. Run the application::
 
      python examples/auth-mongoengine/app.py
-
-

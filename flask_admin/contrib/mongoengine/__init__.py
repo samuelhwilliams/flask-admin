@@ -3,8 +3,8 @@ try:
     import mongoengine
 except ImportError:
     raise Exception(
-        'Could not import `mongoengine`. '
-        'Enable `mongoengine` integration by installing `flask-admin[mongoengine]`'
+        "Could not import `mongoengine`. "
+        "Enable `mongoengine` integration by installing `flask-admin[mongoengine]`"
     )
 
 from .view import ModelView

@@ -1,20 +1,24 @@
-from flask import Flask, url_for, redirect, render_template, request
-from flask_mongoengine import MongoEngine
-
-from wtforms import form, fields, validators
-
 import flask_admin as admin
 import flask_login as login
+from flask import Flask
+from flask import redirect
+from flask import render_template
+from flask import request
+from flask import url_for
 from flask_admin.contrib.mongoengine import ModelView
+from flask_mongoengine import MongoEngine
+from wtforms import fields
+from wtforms import form
+from wtforms import validators
 
 # Create application
 app = Flask(__name__)
 
 # Create dummy secrey key so we can use sessions
-app.config['SECRET_KEY'] = '123456790'
+app.config["SECRET_KEY"] = "123456790"
 
 # MongoDB settings
-app.config['MONGODB_SETTINGS'] = {'DB': 'test'}
+app.config["MONGODB_SETTINGS"] = {"DB": "test"}
 db = MongoEngine()
 db.init_app(app)
 
@@ -58,10 +62,10 @@ class LoginForm(form.Form):
         user = self.get_user()
 
         if user is None:
-            raise validators.ValidationError('Invalid user')
+            raise validators.ValidationError("Invalid user")
 
         if user.password != self.password.data:
-            raise validators.ValidationError('Invalid password')
+            raise validators.ValidationError("Invalid password")
 
     def get_user(self):
         return User.objects(login=self.login.data).first()
@@ -74,7 +78,7 @@ class RegistrationForm(form.Form):
 
     def validate_login(self, field):
         if User.objects(login=self.login.data):
-            raise validators.ValidationError('Duplicate username')
+            raise validators.ValidationError("Duplicate username")
 
 
 # Initialize flask-login
@@ -101,48 +105,49 @@ class MyAdminIndexView(admin.AdminIndexView):
 
 
 # Flask views
-@app.route('/')
+@app.route("/")
 def index():
-    return render_template('index.html', user=login.current_user)
+    return render_template("index.html", user=login.current_user)
 
 
-@app.route('/login/', methods=('GET', 'POST'))
+@app.route("/login/", methods=("GET", "POST"))
 def login_view():
     form = LoginForm(request.form)
-    if request.method == 'POST' and form.validate():
+    if request.method == "POST" and form.validate():
         user = form.get_user()
         login.login_user(user)
-        return redirect(url_for('index'))
+        return redirect(url_for("index"))
 
-    return render_template('form.html', form=form)
+    return render_template("form.html", form=form)
 
 
-@app.route('/register/', methods=('GET', 'POST'))
+@app.route("/register/", methods=("GET", "POST"))
 def register_view():
     form = RegistrationForm(request.form)
-    if request.method == 'POST' and form.validate():
+    if request.method == "POST" and form.validate():
         user = User()
 
         form.populate_obj(user)
         user.save()
 
         login.login_user(user)
-        return redirect(url_for('index'))
+        return redirect(url_for("index"))
 
-    return render_template('form.html', form=form)
+    return render_template("form.html", form=form)
 
 
-@app.route('/logout/')
+@app.route("/logout/")
 def logout_view():
     login.logout_user()
-    return redirect(url_for('index'))
+    return redirect(url_for("index"))
 
-if __name__ == '__main__':
+
+if __name__ == "__main__":
     # Initialize flask-login
     init_login()
 
     # Create admin
-    admin = admin.Admin(app, 'Example: Auth-Mongo', index_view=MyAdminIndexView())
+    admin = admin.Admin(app, "Example: Auth-Mongo", index_view=MyAdminIndexView())
 
     # Add view
     admin.add_view(MyModelView(User))

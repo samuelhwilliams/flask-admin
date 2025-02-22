@@ -1,18 +1,17 @@
 import datetime
 
-from flask import Flask
-
 import flask_admin as admin
-from flask_mongoengine import MongoEngine
-from flask_admin.form import rules
+from flask import Flask
 from flask_admin.contrib.mongoengine import ModelView
+from flask_admin.form import rules
+from flask_mongoengine import MongoEngine
 
 # Create application
 app = Flask(__name__)
 
 # Create dummy secrey key so we can use sessions
-app.config['SECRET_KEY'] = '123456790'
-app.config['MONGODB_SETTINGS'] = {'DB': 'testing'}
+app.config["SECRET_KEY"] = "123456790"
+app.config["MONGODB_SETTINGS"] = {"DB": "testing"}
 
 # Create models
 db = MongoEngine()
@@ -22,7 +21,7 @@ db.init_app(app)
 # Define mongoengine documents
 class User(db.Document):
     name = db.StringField(max_length=40)
-    tags = db.ListField(db.ReferenceField('Tag'))
+    tags = db.ListField(db.ReferenceField("Tag"))
     password = db.StringField(max_length=40)
 
     def __unicode__(self):
@@ -73,53 +72,42 @@ class Image(db.Document):
 
 # Customized admin views
 class UserView(ModelView):
-    column_filters = ['name']
+    column_filters = ["name"]
 
-    column_searchable_list = ('name', 'password')
+    column_searchable_list = ("name", "password")
 
-    form_ajax_refs = {
-        'tags': {
-            'fields': ('name',)
-        }
-    }
+    form_ajax_refs = {"tags": {"fields": ("name",)}}
 
 
 class TodoView(ModelView):
-    column_filters = ['done']
+    column_filters = ["done"]
 
-    form_ajax_refs = {
-        'user': {
-            'fields': ['name']
-        }
-    }
+    form_ajax_refs = {"user": {"fields": ["name"]}}
 
 
 class PostView(ModelView):
     form_subdocuments = {
-        'inner': {
-            'form_subdocuments': {
+        "inner": {
+            "form_subdocuments": {
                 None: {
                     # Add <hr> at the end of the form
-                    'form_rules': ('name', 'tag', 'value', rules.HTML('<hr>')),
-                    'form_widget_args': {
-                        'name': {
-                            'style': 'color: red'
-                        }
-                    }
+                    "form_rules": ("name", "tag", "value", rules.HTML("<hr>")),
+                    "form_widget_args": {"name": {"style": "color: red"}},
                 }
             }
         }
     }
 
+
 # Flask views
-@app.route('/')
+@app.route("/")
 def index():
     return '<a href="/admin/">Click me to get to Admin!</a>'
 
 
-if __name__ == '__main__':
+if __name__ == "__main__":
     # Create admin
-    admin = admin.Admin(app, 'Example: MongoEngine')
+    admin = admin.Admin(app, "Example: MongoEngine")
 
     # Add views
     admin.add_view(UserView(User))
