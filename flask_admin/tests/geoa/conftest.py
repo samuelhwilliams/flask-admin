@@ -5,9 +5,14 @@ from flask_admin import Admin
 
 
 @pytest.fixture
-def db():
+def db(app):
     db = SQLAlchemy()
+
     yield db
+
+    with app.app_context():
+        db.session.close()
+        db.engine.dispose()
 
 
 @pytest.fixture
