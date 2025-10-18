@@ -298,11 +298,8 @@ package = "wheel"
 wheel_build_env = ".pkg"
 extras = ["all"]
 setenv = { SQLALCHEMY_SILENCE_UBER_WARNING = "1" }
-# Pass environment variables for testcontainers and optional external database overrides
+# Pass environment variables for testcontainers Docker access
 pass_env = [
-    "AZURE_STORAGE_CONNECTION_STRING",
-    "SQLALCHEMY_DATABASE_URI",
-    "MONGOCLIENT_HOST",
     "DOCKER_HOST",
     "DOCKER_CERT_PATH",
     "DOCKER_TLS_VERIFY",

@@ -13,14 +13,9 @@ class TestAzureFileAdmin(Base.FileAdminTests):
     def setup_and_teardown(self, azurite_container):
         """
         Setup Azure Blob Storage test environment.
-        Uses azurite_container from parent conftest (testcontainer or CI service).
+        Uses azurite_container from parent conftest.
         """
-        # azurite_container ensures AZURE_STORAGE_CONNECTION_STRING is set
-        azure_connection_string = os.getenv("AZURE_STORAGE_CONNECTION_STRING")
-
-        if not azure_connection_string:
-            pytest.skip("Azure Storage not available (no Docker or connection string)")
-
+        azure_connection_string = azurite_container.get_connection_string()
         self._container_name = f"fileadmin-tests-{uuid4()}"
 
         try:

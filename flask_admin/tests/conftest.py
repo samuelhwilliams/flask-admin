@@ -1,5 +1,3 @@
-import os
-
 import pytest
 from flask import Flask
 from jinja2 import StrictUndefined
@@ -16,7 +14,7 @@ from flask_admin import Admin
 def docker_available():
     """Check if Docker is available for testcontainers."""
     try:
-        import docker
+        import docker  # type: ignore[import-untyped]
 
         client = docker.from_env()
         client.ping()
@@ -29,18 +27,15 @@ def docker_available():
 def postgres_container(docker_available):
     """
     Session-scoped PostGIS container for PostgreSQL tests.
-    Falls back to environment variable if SQLALCHEMY_DATABASE_URI is set.
+    Returns the container object; use .get_connection_url() to get connection string.
     """
-    # If SQLALCHEMY_DATABASE_URI is set, use that instead
-    if os.getenv("SQLALCHEMY_DATABASE_URI"):
-        yield None  # Use environment-provided database
-        return
-
     if not docker_available:
         pytest.skip("Docker not available for testcontainers")
 
     import sqlalchemy
-    from testcontainers.postgres import PostgresContainer
+    from testcontainers.postgres import (  # type: ignore[import-not-found]
+        PostgresContainer,
+    )
 
     # Use PostGIS image for GeoAlchemy support
     with PostgresContainer(
@@ -49,10 +44,8 @@ def postgres_container(docker_available):
         password="postgres",
         dbname="flask_admin_test",
     ) as container:
-        connection_url = container.get_connection_url()
-        os.environ["SQLALCHEMY_DATABASE_URI"] = connection_url
-
         # Create required PostgreSQL extensions
+        connection_url = container.get_connection_url()
         engine = sqlalchemy.create_engine(connection_url)
         with engine.begin() as conn:
             # hstore extension - required for test_hstore
@@ -66,27 +59,16 @@ def postgres_container(docker_available):
 def mongo_container(docker_available):
     """
     Session-scoped MongoDB container for MongoDB/MongoEngine tests.
-    Falls back to environment variable if MONGOCLIENT_HOST is set.
+    Returns the container object; use .get_connection_url() to get connection string.
     """
-    # If MONGOCLIENT_HOST is set, use that instead
-    if os.getenv("MONGOCLIENT_HOST"):
-        yield None  # Use environment-provided database
-        return
-
     if not docker_available:
         pytest.skip("Docker not available for testcontainers")
 
-    from testcontainers.mongodb import MongoDbContainer
+    from testcontainers.mongodb import (  # type: ignore[import-not-found]
+        MongoDbContainer,
+    )
 
     with MongoDbContainer(image="mongo:5.0.14-focal") as container:
-        # Store full connection URL with authentication credentials
-        # Format: mongodb://username:password@host:port/
-        connection_url = container.get_connection_url()
-        os.environ["MONGODB_CONNECTION_URL"] = connection_url
-
-        # Also extract host for backward compatibility
-        os.environ["MONGOCLIENT_HOST"] = connection_url.split("@")[1].split("/")[0]
-
         yield container
 
 
@@ -94,19 +76,16 @@ def mongo_container(docker_available):
 def azurite_container(docker_available):
     """
     Session-scoped Azurite container for Azure Blob Storage tests.
-    Falls back to environment variable if AZURE_STORAGE_CONNECTION_STRING is set.
+    Returns the container object; use .get_connection_string() to get connection string.
     """
-    # If AZURE_STORAGE_CONNECTION_STRING is set, use that instead
-    if os.getenv("AZURE_STORAGE_CONNECTION_STRING"):
-        yield None  # Use environment-provided storage
-        return
-
     if not docker_available:
         pytest.skip("Docker not available for testcontainers")
 
     import time
 
-    from testcontainers.core.container import DockerContainer
+    from testcontainers.core.container import (  # type: ignore[import-not-found]
+        DockerContainer,
+    )
 
     # Azurite container for Azure Blob Storage emulation
     container = DockerContainer(image="mcr.microsoft.com/azure-storage/azurite:latest")
@@ -118,17 +97,17 @@ def azurite_container(docker_available):
     # Give Azurite a moment to start up
     time.sleep(2)
 
-    # Get the mapped port
-    blob_port = container.get_exposed_port(10000)
+    # Add a helper method to get the connection string
+    def get_connection_string():
+        blob_port = container.get_exposed_port(10000)
+        return (
+            f"DefaultEndpointsProtocol=http;"
+            f"AccountName=devstoreaccount1;"
+            f"AccountKey=Eby8vdM02xNOcqFlqUwJPLlmEtlCDXJ1OUzFT50uSRZ6IFsuFq2UVErCz4I6tq/K1SZFPTOtr/KBHBeksoGMGw==;"
+            f"BlobEndpoint=http://localhost:{blob_port}/devstoreaccount1;"
+        )
 
-    # Set standard Azurite development connection string
-    connection_string = (
-        f"DefaultEndpointsProtocol=http;"
-        f"AccountName=devstoreaccount1;"
-        f"AccountKey=Eby8vdM02xNOcqFlqUwJPLlmEtlCDXJ1OUzFT50uSRZ6IFsuFq2UVErCz4I6tq/K1SZFPTOtr/KBHBeksoGMGw==;"
-        f"BlobEndpoint=http://localhost:{blob_port}/devstoreaccount1;"
-    )
-    os.environ["AZURE_STORAGE_CONNECTION_STRING"] = connection_string
+    container.get_connection_string = get_connection_string
 
     yield container
 
