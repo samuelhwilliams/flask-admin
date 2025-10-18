@@ -400,7 +400,7 @@ description = "pytest without flask-babel"
 base = ["env_run_base"]
 commands = [
     # Remove flask-babel
-    ["uv", "pip", "uninstall", "flask-babel", "-y"],
+    ["uv", "pip", "uninstall", "flask-babel"],
     # Log actual installed versions for auditing
     ["uv", "pip", "list", "--format=freeze"],
     # Run tests
