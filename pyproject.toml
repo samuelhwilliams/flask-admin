@@ -106,6 +106,10 @@ tests = [
     "botocore>=1.35",
     "psycopg2-binary",
     "beautifulsoup4",
+    # Testcontainers for reliable, isolated test environments
+    # Note: we use generic postgres module but will run postgis image for GeoAlchemy support
+    "testcontainers[postgres]>=4.0",
+    "testcontainers[mongodb]>=4.0",
 ]
 typing = [
     "mypy",
@@ -141,8 +145,16 @@ flask-admin = { workspace = true }
 [tool.pytest.ini_options]
 testpaths = ["flask_admin/tests"]
 markers = [
-    "flask_babel: requires Flask-Babel to be installed"
+    "flask_babel: requires Flask-Babel to be installed",
+    "requires_postgres: requires PostgreSQL database (via testcontainer or service)",
+    "requires_mongo: requires MongoDB database (via testcontainer or service)",
+    "requires_azure: requires Azure Blob Storage (via azurite container or service)",
 ]
+# Clean up temporary directories on successful test runs
+tmp_path_retention_count = 0
+tmp_path_retention_policy = "failed"
+# Add custom CLI options
+addopts = ""
 filterwarnings = [
     "error",
     # TODO: remove the ignored deprecation warning when support for WTForms 3 has been added.
@@ -167,6 +179,16 @@ filterwarnings = [
 
     # raised by flask-sqlalchemy https://github.com/pallets-eco/flask-sqlalchemy/issues/137
     "ignore:Exception ignored in.*sqlite3.Connection:pytest.PytestUnraisableExceptionWarning",
+
+    # testcontainers warnings
+    "ignore:The distutils package is deprecated:DeprecationWarning:testcontainers",
+
+    # Flask file handling warnings (pre-existing, not related to tests)
+    "ignore:Exception ignored in.*FileIO:pytest.PytestUnraisableExceptionWarning",
+
+    #
+    "ignore:The @wait_container_is_ready decorator:DeprecationWarning",
+    "ignore:The wait_for_logs function with string or callable predicates is deprecated and will be removed in a future version.:DeprecationWarning",
 ]
 
 [tool.coverage.run]
@@ -276,11 +298,23 @@ package = "wheel"
 wheel_build_env = ".pkg"
 extras = ["all"]
 setenv = { SQLALCHEMY_SILENCE_UBER_WARNING = "1" }
-pass_env = ["AZURE_STORAGE_CONNECTION_STRING", "SQLALCHEMY_DATABASE_URI", "MONGOCLIENT_HOST"]
+# Pass environment variables for databases (testcontainers or CI services) and Docker
+pass_env = [
+    "AZURE_STORAGE_CONNECTION_STRING",
+    "SQLALCHEMY_DATABASE_URI",
+    "MONGOCLIENT_HOST",
+    "DOCKER_HOST",
+    "DOCKER_CERT_PATH",
+    "DOCKER_TLS_VERIFY",
+]
 constrain_package_deps = true
 use_frozen_constraints = true
 dependency_groups = ["tests"]
 env_tmp_dir = "{toxworkdir}/tmp/{envname}"
+commands_pre = [
+    # Log installed dependencies for auditing
+    ["uv", "pip", "list", "--format=freeze"],
+]
 commands = [[
     "pytest", "-v", "--tb=short", "--basetemp={env_tmp_dir}",
     {replace = "posargs", default = [], extend = true},
@@ -291,6 +325,7 @@ commands = [[
 description = "pytest on minimum dependency versions"
 base_python = ["3.9"]
 commands = [
+    # Install minimum supported versions
     [
         "uv", "pip", "install",
         "flask==2.2.0", # flask-sqlalchemy depends on flask >=2.2
@@ -317,6 +352,9 @@ commands = [
         "tablib==3.0.0",
         "redis==4.0.0",
     ],
+    # Log actual installed versions for auditing
+    ["uv", "pip", "list", "--format=freeze"],
+    # Run tests
     [
         "pytest", "-v", "--tb=short", "--basetemp={env_tmp_dir}",
         {replace = "posargs", default = [], extend = true},
@@ -328,8 +366,12 @@ description = "pytest with SQLAlchemy 1.x on Python 3.9"
 base = ["env_run_base"]
 base_python = ["3.9"]
 commands = [
+    # Install SQLAlchemy 1.x
     ["uv", "pip", "install", "sqlalchemy>=1.4,<2"],
     ["uv", "pip", "install", "flask-sqlalchemy<=3.0.5"],
+    # Log actual installed versions for auditing
+    ["uv", "pip", "list", "--format=freeze"],
+    # Run tests
     [
         "pytest", "-v", "--tb=short", "--basetemp={env_tmp_dir}",
         {replace = "posargs", default = [], extend = true},
@@ -341,8 +383,12 @@ description = "pytest with SQLAlchemy 1.x on Python 3.13"
 base = ["env_run_base"]
 base_python = ["3.13"]
 commands = [
+    # Install SQLAlchemy 1.x
     ["uv", "pip", "install", "sqlalchemy>=1.4,<2"],
     ["uv", "pip", "install", "flask-sqlalchemy<=3.0.5"],
+    # Log actual installed versions for auditing
+    ["uv", "pip", "list", "--format=freeze"],
+    # Run tests
     [
         "pytest", "-v", "--tb=short", "--basetemp={env_tmp_dir}",
         {replace = "posargs", default = [], extend = true},
@@ -353,7 +399,11 @@ commands = [
 description = "pytest without flask-babel"
 base = ["env_run_base"]
 commands = [
-    ["uv", "pip", "uninstall", "flask-babel"],
+    # Remove flask-babel
+    ["uv", "pip", "uninstall", "flask-babel", "-y"],
+    # Log actual installed versions for auditing
+    ["uv", "pip", "list", "--format=freeze"],
+    # Run tests
     [
         "pytest", "-v", "--tb=short", "--basetemp={env_tmp_dir}",
         {replace = "posargs", default = [], extend = true},

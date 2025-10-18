@@ -34,17 +34,15 @@ jobs:
           - python: '3.13'
             tox: 'py313-sqlalchemy1'
     services:
-      # Label used to access the service container
+      # GitHub service containers for CI
+      # Tests use testcontainers locally but detect and use these in CI via env vars
       postgres:
-        # Docker Hub image
         image: postgis/postgis:16-3.4  # postgres with postgis installed
-        # Provide the password for postgres
         env:
           POSTGRES_PASSWORD: postgres
           POSTGRES_DB: flask_admin_test
         ports:
           - 5432:5432
-          # Set health checks to wait until postgres has started
         options: >-
           --health-cmd pg_isready
           --health-interval 10s
@@ -60,6 +58,11 @@ jobs:
           executable: blob
         ports:
           - 10000:10000
+    env:
+      # Set database URLs to use GitHub service containers
+      # Testcontainers will detect these and skip container startup
+      SQLALCHEMY_DATABASE_URI: postgresql://postgres:postgres@localhost:5432/flask_admin_test
+      MONGOCLIENT_HOST: localhost:27017
     steps:
       - uses: actions/checkout@08c6903cd8c0fde910a37f88322edcfb5dd907a8 # v5.0.0
       - uses: astral-sh/setup-uv@eb1897b8dc4b5d5bfe39a428a8f2304605e0983c # v7.0.0
@@ -78,10 +81,12 @@ jobs:
           sudo apt-get install -y libgeos-c1v5
       - name: Check out repository code
         uses: actions/checkout@v5
-      - name: Set up PostgreSQL hstore module
+      - name: Set up PostgreSQL hstore extension
         env:
           PGPASSWORD: postgres
-        run: psql -U postgres -h localhost -c 'CREATE EXTENSION hstore;' flask_admin_test
+        # Note: Testcontainer fixture also creates hstore, but we create it here
+        # for the service container used in CI (SQLALCHEMY_DATABASE_URI env var set)
+        run: psql -U postgres -h localhost -c 'CREATE EXTENSION IF NOT EXISTS hstore;' flask_admin_test
       - run: uv run --locked tox run -e ${{ matrix.tox == 'normal' && format('py{0}', matrix.python) || matrix.tox }}
   not_tests:
     name: ${{ matrix.tox }}

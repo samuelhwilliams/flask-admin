@@ -8,6 +8,8 @@ from flask_admin import Admin
 def db():
     db = peewee.SqliteDatabase(":memory:")
     yield db
+
+    # Cleanup: close all connections and clear metadata
     db.close()
 
 
