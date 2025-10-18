@@ -298,7 +298,7 @@ package = "wheel"
 wheel_build_env = ".pkg"
 extras = ["all"]
 setenv = { SQLALCHEMY_SILENCE_UBER_WARNING = "1" }
-# Pass environment variables for databases (testcontainers or CI services) and Docker
+# Pass environment variables for testcontainers and optional external database overrides
 pass_env = [
     "AZURE_STORAGE_CONNECTION_STRING",
     "SQLALCHEMY_DATABASE_URI",

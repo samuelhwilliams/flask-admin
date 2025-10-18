@@ -29,9 +29,9 @@ def docker_available():
 def postgres_container(docker_available):
     """
     Session-scoped PostGIS container for PostgreSQL tests.
-    Falls back to environment variable if Docker unavailable or in CI.
+    Falls back to environment variable if SQLALCHEMY_DATABASE_URI is set.
     """
-    # If SQLALCHEMY_DATABASE_URI is set (e.g., in CI), use that instead
+    # If SQLALCHEMY_DATABASE_URI is set, use that instead
     if os.getenv("SQLALCHEMY_DATABASE_URI"):
         yield None  # Use environment-provided database
         return
@@ -53,7 +53,6 @@ def postgres_container(docker_available):
         os.environ["SQLALCHEMY_DATABASE_URI"] = connection_url
 
         # Create required PostgreSQL extensions
-        # (Matches what CI does in GitHub Actions workflow)
         engine = sqlalchemy.create_engine(connection_url)
         with engine.begin() as conn:
             # hstore extension - required for test_hstore
@@ -67,10 +66,9 @@ def postgres_container(docker_available):
 def mongo_container(docker_available):
     """
     Session-scoped MongoDB container for MongoDB/MongoEngine tests.
-    Falls back to environment variable if Docker unavailable or in CI.
+    Falls back to environment variable if MONGOCLIENT_HOST is set.
     """
-    # If MONGOCLIENT_HOST is set (e.g., in CI), use that instead
-    # CI uses service containers without auth, just host:port
+    # If MONGOCLIENT_HOST is set, use that instead
     if os.getenv("MONGOCLIENT_HOST"):
         yield None  # Use environment-provided database
         return
@@ -86,8 +84,7 @@ def mongo_container(docker_available):
         connection_url = container.get_connection_url()
         os.environ["MONGODB_CONNECTION_URL"] = connection_url
 
-        # Also extract host for backward compatibility with CI pattern
-        # In local testcontainer mode, this will be overridden by MONGODB_CONNECTION_URL
+        # Also extract host for backward compatibility
         os.environ["MONGOCLIENT_HOST"] = connection_url.split("@")[1].split("/")[0]
 
         yield container
@@ -97,9 +94,9 @@ def mongo_container(docker_available):
 def azurite_container(docker_available):
     """
     Session-scoped Azurite container for Azure Blob Storage tests.
-    Falls back to environment variable if Docker unavailable or in CI.
+    Falls back to environment variable if AZURE_STORAGE_CONNECTION_STRING is set.
     """
-    # If AZURE_STORAGE_CONNECTION_STRING is set (e.g., in CI), use that instead
+    # If AZURE_STORAGE_CONNECTION_STRING is set, use that instead
     if os.getenv("AZURE_STORAGE_CONNECTION_STRING"):
         yield None  # Use environment-provided storage
         return
