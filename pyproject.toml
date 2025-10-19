@@ -186,9 +186,13 @@ filterwarnings = [
     # Flask file handling warnings (pre-existing, not related to tests)
     "ignore:Exception ignored in.*FileIO:pytest.PytestUnraisableExceptionWarning",
 
-    #
+    # Thrown by testcontainers; not in our control
     "ignore:The @wait_container_is_ready decorator:DeprecationWarning",
     "ignore:The wait_for_logs function with string or callable predicates is deprecated and will be removed in a future version.:DeprecationWarning",
+
+    # flagged by py39-min tests
+    "ignore:'werkzeug.urls.URL' is deprecated and will be removed in Werkzeug 3.0.:DeprecationWarning",
+    "ignore:'werkzeug.urls.url_parse' is deprecated and will be removed in Werkzeug 3.0.:DeprecationWarning",
 ]
 
 [tool.coverage.run]
