@@ -1,5 +1,3 @@
-import os
-
 import pytest
 from flask_sqlalchemy import SQLAlchemy
 
@@ -13,11 +11,12 @@ def db():
 
 
 @pytest.fixture
-def admin(app, babel, db):
-    app.config["SQLALCHEMY_DATABASE_URI"] = os.getenv(
-        "SQLALCHEMY_DATABASE_URI",
-        "postgresql://postgres:postgres@localhost/flask_admin_test",
-    )
+def admin(app, babel, db, postgres_container):
+    """
+    GeoAlchemy admin fixture with PostgreSQL/PostGIS database.
+    Uses postgres_container from parent conftest.
+    """
+    app.config["SQLALCHEMY_DATABASE_URI"] = postgres_container.get_connection_url()
     app.config["SQLALCHEMY_ECHO"] = True
     app.config["SQLALCHEMY_TRACK_MODIFICATIONS"] = False
 
@@ -27,3 +26,7 @@ def admin(app, babel, db):
 
     admin = Admin(app)
     yield admin
+
+    # Cleanup: drop all tables and remove session
+    db.session.remove()
+    db.drop_all()

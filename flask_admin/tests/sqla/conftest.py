@@ -1,5 +1,3 @@
-import os
-
 import pytest
 from flask import Flask
 from flask_sqlalchemy import SQLAlchemy
@@ -26,19 +24,29 @@ def db(app):
     app.config["SQLALCHEMY_TRACK_MODIFICATIONS"] = False
     db = SQLAlchemy(app)
     yield db
+    # Cleanup: drop all tables and remove session
+    with app.app_context():
+        db.session.remove()
+        db.drop_all()
 
 
 @pytest.fixture
-def postgres_db(app):
-    app.config["SQLALCHEMY_DATABASE_URI"] = os.getenv(
-        "SQLALCHEMY_DATABASE_URI",
-        "postgresql://postgres:postgres@localhost/flask_admin_test",
-    )
+def postgres_db(app, postgres_container):
+    """
+    PostgreSQL database fixture.
+    Uses postgres_container from parent conftest.
+    """
+    app.config["SQLALCHEMY_DATABASE_URI"] = postgres_container.get_connection_url()
     app.config["SQLALCHEMY_ECHO"] = True
     app.config["SQLALCHEMY_TRACK_MODIFICATIONS"] = False
 
     db = SQLAlchemy(app)
     yield db
+
+    # Cleanup: drop all tables and remove session
+    with app.app_context():
+        db.session.remove()
+        db.drop_all()
 
 
 @pytest.fixture
