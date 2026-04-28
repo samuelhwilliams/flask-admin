@@ -1833,6 +1833,237 @@ def test_column_filters_sqla_obj(app, sqla_db_ext, admin, session_or_db):
         assert len(view._filters) == 7
 
 
+def test_column_filters_dotted_path(app, sqla_db_ext, admin, session_or_db):
+    with app.app_context():
+        Model1, Model2 = create_models(sqla_db_ext)
+        fill_db(sqla_db_ext, Model1, Model2)
+
+        param = skip_or_return_session_or_db(sqla_db_ext, session_or_db)
+
+        # FilterInList with a dotted path traverses Model2 -> model1 -> test1.
+        flt = filters.FilterInList(column="model1.test1", name="Model1 Test1")
+        view = CustomModelView(
+            Model2, param, column_filters=[flt], endpoint="_dotted_path"
+        )
+        admin.add_view(view)
+
+        # Binding resolves the string into the real attribute and records joins.
+        assert flt._bound is True
+        assert flt.column is Model1.test1
+        assert flt._joins  # at least one relationship to traverse
+        assert flt.key_name == "model1.test1"
+        assert "model1.test1" in view._filter_joins
+
+        client = app.test_client()
+        rv = client.get("/admin/_dotted_path/?flt0_0=test1_val_1")
+        assert rv.status_code == 200
+        data = rv.data.decode("utf-8")
+        assert "test2_val_1" in data  # joined row matches
+        assert "test2_val_2" not in data  # joined row excluded
+
+
+def test_column_filters_dotted_path_unresolvable(
+    app, sqla_db_ext, admin, session_or_db
+):
+    with app.app_context():
+        Model1, Model2 = create_models(sqla_db_ext)
+        param = skip_or_return_session_or_db(sqla_db_ext, session_or_db)
+
+        flt = filters.FilterInList(column="does_not_exist", name="Missing")
+        # Path is unresolved until the view binds it.
+        assert flt._bound is False
+        assert flt.column == "does_not_exist"
+
+        with pytest.raises(ValueError, match="Could not resolve filter path"):
+            CustomModelView(
+                Model2, param, column_filters=[flt], endpoint="_dotted_path_bad"
+            )
+
+
+def test_enum_filter_dotted_path(app, sqla_db_ext, admin, session_or_db):
+    """Verify _on_column_resolved hook fires for Enum filters with string columns."""
+    with app.app_context():
+        Model1, Model2 = create_models(sqla_db_ext)
+        param = skip_or_return_session_or_db(sqla_db_ext, session_or_db)
+
+        flt = filters.EnumEqualFilter(
+            column="model1.enum_type_field", name="Model1 Enum"
+        )
+        # Before binding, enum_class is unset because column was a string.
+        assert flt.enum_class is None
+
+        view = CustomModelView(
+            Model2, param, column_filters=[flt], endpoint="_dotted_enum"
+        )
+        admin.add_view(view)
+
+        # Binding ran the hook, which populated enum_class from the resolved column.
+        assert flt._bound is True
+        assert flt.enum_class is Model1.EnumChoices
+        assert flt.column is Model1.enum_type_field
+
+
+def test_get_filter_url(app, sqla_db_ext, admin, session_or_db):
+    with app.app_context():
+        Model1, Model2 = create_models(sqla_db_ext)
+        param = skip_or_return_session_or_db(sqla_db_ext, session_or_db)
+
+        # Identity resolution: pass the same instance that was registered.
+        email_eq = filters.FilterEqual(Model1.test1, "Test1")
+        view_identity = CustomModelView(
+            Model1, param, column_filters=[email_eq], endpoint="filter_url_identity"
+        )
+        admin.add_view(view_identity)
+
+        # Signature resolution: pass a fresh instance with the same (type,column).
+        view_sig = CustomModelView(
+            Model1, param, column_filters=["test1"], endpoint="filter_url_sig"
+        )
+        admin.add_view(view_sig)
+
+        # Unregistered filter target.
+        view_no_greater = CustomModelView(
+            Model1,
+            param,
+            column_filters=[filters.FilterEqual(Model1.test1, "Test1")],
+            endpoint="filter_url_lookup",
+        )
+        admin.add_view(view_no_greater)
+
+        # named_filter_urls -> human-readable key.
+        view_named = CustomModelView(
+            Model1,
+            param,
+            column_filters=["test1"],
+            endpoint="filter_url_named",
+            named_filter_urls=True,
+        )
+        admin.add_view(view_named)
+
+        # Date/time/datetime scaffolding.
+        view_dt = CustomModelView(
+            Model1,
+            param,
+            column_filters=["date_field", "datetime_field", "time_field"],
+            endpoint="filter_url_dt",
+        )
+        admin.add_view(view_dt)
+
+        # Boolean.
+        view_bool = CustomModelView(
+            Model1, param, column_filters=["bool_field"], endpoint="filter_url_bool"
+        )
+        admin.add_view(view_bool)
+
+        with app.test_request_context():
+            url = view_identity.get_filter_url([(email_eq, "test1_val_1")])
+            assert url == "/admin/filter_url_identity/?flt0_0=test1_val_1"
+
+            # column_filters=["test1"] scaffolds: contains, not contains, equals,
+            # not equal, empty, in list, not in list — FilterEqual is at index 2.
+            url = view_sig.get_filter_url(
+                [(filters.FilterEqual(Model1.test1, "Test1"), "test1_val_1")]
+            )
+            assert url == "/admin/filter_url_sig/?flt0_2=test1_val_1"
+
+            # Disambiguation: same column, different operations -> different
+            # indices.
+            url = view_sig.get_filter_url(
+                [(filters.FilterLike(Model1.test1, "Test1"), "foo")]
+            )
+            assert url == "/admin/filter_url_sig/?flt0_0=foo"
+            url = view_sig.get_filter_url(
+                [(filters.FilterNotLike(Model1.test1, "Test1"), "foo")]
+            )
+            assert url == "/admin/filter_url_sig/?flt0_1=foo"
+
+            # Unregistered filter -> LookupError listing what *is* registered.
+            with pytest.raises(LookupError) as exc_info:
+                view_no_greater.get_filter_url(
+                    [(filters.FilterGreater(Model1.test1, "Test1"), "x")]
+                )
+            message = str(exc_info.value)
+            assert "FilterGreater" in message
+            assert "FilterEqual" in message  # registered alternative
+
+            # Pass-through: page, page_size, sort, sort_desc, search, extra args.
+            url = view_sig.get_filter_url(
+                [(filters.FilterEqual(Model1.test1, "Test1"), "x")],
+                page=2,
+                page_size=50,
+                sort=1,
+                sort_desc=True,
+                search="alice",
+                extra="hello",
+            )
+            assert "page=2" in url
+            assert "page_size=50" in url
+            assert "sort=1" in url
+            assert "desc=1" in url
+            assert "search=alice" in url
+            assert "extra=hello" in url
+            assert "flt0_2=x" in url
+
+            # named_filter_urls -> human-readable key.
+            url = view_named.get_filter_url(
+                [(filters.FilterEqual(Model1.test1, "Test1"), "test1_val_1")]
+            )
+            assert url == ("/admin/filter_url_named/?flt0_test1_equals=test1_val_1")
+
+            # Value formatting: date, datetime, time, bool.
+            url = view_dt.get_filter_url(
+                [
+                    (
+                        filters.DateEqualFilter(Model1.date_field, "Date"),
+                        date(2024, 1, 2),
+                    )
+                ]
+            )
+            assert "flt0_0=2024-01-02" in url
+
+            url = view_dt.get_filter_url(
+                [
+                    (
+                        filters.DateTimeEqualFilter(Model1.datetime_field, "DT"),
+                        datetime(2024, 1, 2, 3, 4, 5),
+                    )
+                ]
+            )
+            assert "flt0_7=2024-01-02+03:04:05" in url
+
+            url = view_dt.get_filter_url(
+                [
+                    (
+                        filters.TimeEqualFilter(Model1.time_field, "T"),
+                        time(11, 22, 33),
+                    )
+                ]
+            )
+            assert "flt0_14=11:22:33" in url
+
+            url = view_bool.get_filter_url(
+                [(filters.BooleanEqualFilter(Model1.bool_field, "Bool"), True)]
+            )
+            assert "flt0_0=1" in url
+            url = view_bool.get_filter_url(
+                [(filters.BooleanEqualFilter(Model1.bool_field, "Bool"), False)]
+            )
+            assert "flt0_0=0" in url
+
+        # Round-trip: feed the generated URL back through the test client.
+        fill_db(sqla_db_ext, Model1, Model2)
+        client = app.test_client()
+        with app.test_request_context():
+            url = view_sig.get_filter_url(
+                [(filters.FilterEqual(Model1.test1, "Test1"), "test1_val_1")]
+            )
+        rv = client.get(url)
+        assert rv.status_code == 200
+        data = rv.data.decode("utf-8")
+        assert "test2_val_1" in data
+        assert "test1_val_2" not in data
+
+
 def test_hybrid_property(app, sqla_db_ext, admin, session_or_db):
     with app.app_context():
 

@@ -22,7 +22,7 @@ class BaseSQLAFilter(filters.BaseFilter):
 
     def __init__(
         self,
-        column: T_SQLALCHEMY_COLUMN | T_INSTRUMENTED_ATTRIBUTE,
+        column: T_SQLALCHEMY_COLUMN | T_INSTRUMENTED_ATTRIBUTE | str,
         name: str,
         options: T_OPTIONS = None,
         data_type: T_WIDGET_TYPE = None,
@@ -31,7 +31,9 @@ class BaseSQLAFilter(filters.BaseFilter):
         Constructor.
 
         :param column:
-            Model field
+            Model field. Either a SQLAlchemy column / ``InstrumentedAttribute``,
+            or a dotted-path string (e.g. ``"author.account.email"``) that will
+            be resolved against the view's model when the filter is bound.
         :param name:
             Display name
         :param options:
@@ -42,6 +44,51 @@ class BaseSQLAFilter(filters.BaseFilter):
         super().__init__(name, options, data_type)
 
         self.column = column
+        self._joins: list[t.Any] | None = None
+        self._bound = False
+
+        # Eagerly finalize when we already have a real attribute. String
+        # columns can only be resolved once the view supplies its model, so
+        # they stay deferred until :meth:`bind` is called.
+        if not isinstance(column, str):
+            self._on_column_resolved()
+            self._bound = True
+
+    def bind(self, model: type) -> None:
+        """
+        Resolve a string column against ``model`` and record any joins
+        needed to reach it. No-op for filters constructed with a real
+        ``Column``/``InstrumentedAttribute`` (those auto-bind in ``__init__``).
+
+        Subclasses that need to introspect ``self.column`` should override
+        :meth:`_on_column_resolved` rather than ``__init__`` so the hook
+        works for both eager (real column) and deferred (string path) inputs.
+        """
+        if self._bound:
+            return
+        try:
+            attr, joins = tools.get_field_with_path(model, self.column)
+        except AttributeError as exc:
+            raise ValueError(
+                f"Could not resolve filter path {self.column!r} "
+                f"on {model.__name__}: {exc}"
+            ) from exc
+        if attr is None:
+            raise ValueError(
+                f"Could not resolve filter path {self.column!r} " f"on {model.__name__}"
+            )
+        self.key_name = self.column
+        self.column = attr
+        self._joins = joins
+        self._on_column_resolved()
+        self._bound = True
+
+    def _on_column_resolved(self) -> None:
+        """
+        Hook called once ``self.column`` is guaranteed to be a real SQLAlchemy
+        attribute. Override in subclasses to introspect column type, options,
+        etc. Default is a no-op.
+        """
 
     def get_column(
         self, alias: t.Any
@@ -366,13 +413,20 @@ class TimeNotBetweenFilter(TimeBetweenFilter):
 class EnumEqualFilter(FilterEqual):
     def __init__(
         self,
-        column: T_SQLALCHEMY_COLUMN,
+        column: t.Union[T_SQLALCHEMY_COLUMN, str],
         name: str,
         options: T_OPTIONS = None,
         **kwargs: t.Any,
     ) -> None:
-        self.enum_class = column.type.enum_class  # type: ignore[attr-defined]
+        self.enum_class = (
+            None if isinstance(column, str) else column.type.enum_class  # type: ignore[attr-defined]
+        )
         super().__init__(column, name, options, **kwargs)
+
+    def _on_column_resolved(self) -> None:
+        super()._on_column_resolved()
+        if self.enum_class is None:
+            self.enum_class = self.column.type.enum_class  # type: ignore[attr-defined]
 
     def clean(self, value: t.Any) -> t.Any:
         if self.enum_class is None:
@@ -383,13 +437,20 @@ class EnumEqualFilter(FilterEqual):
 class EnumFilterNotEqual(FilterNotEqual):
     def __init__(
         self,
-        column: T_SQLALCHEMY_COLUMN,
+        column: t.Union[T_SQLALCHEMY_COLUMN, str],
         name: str,
         options: T_OPTIONS = None,
         **kwargs: t.Any,
     ) -> None:
-        self.enum_class = column.type.enum_class  # type: ignore[attr-defined]
+        self.enum_class = (
+            None if isinstance(column, str) else column.type.enum_class  # type: ignore[attr-defined]
+        )
         super().__init__(column, name, options, **kwargs)
+
+    def _on_column_resolved(self) -> None:
+        super()._on_column_resolved()
+        if self.enum_class is None:
+            self.enum_class = self.column.type.enum_class  # type: ignore[attr-defined]
 
     def clean(self, value: t.Any) -> t.Any:
         if self.enum_class is None:
@@ -400,25 +461,39 @@ class EnumFilterNotEqual(FilterNotEqual):
 class EnumFilterEmpty(FilterEmpty):
     def __init__(
         self,
-        column: T_SQLALCHEMY_COLUMN,
+        column: t.Union[T_SQLALCHEMY_COLUMN, str],
         name: str,
         options: T_OPTIONS = None,
         **kwargs: t.Any,
     ) -> None:
-        self.enum_class = column.type.enum_class  # type: ignore[attr-defined]
+        self.enum_class = (
+            None if isinstance(column, str) else column.type.enum_class  # type: ignore[attr-defined]
+        )
         super().__init__(column, name, options, **kwargs)
+
+    def _on_column_resolved(self) -> None:
+        super()._on_column_resolved()
+        if self.enum_class is None:
+            self.enum_class = self.column.type.enum_class  # type: ignore[attr-defined]
 
 
 class EnumFilterInList(FilterInList):
     def __init__(
         self,
-        column: T_SQLALCHEMY_COLUMN,
+        column: t.Union[T_SQLALCHEMY_COLUMN, str],
         name: str,
         options: T_OPTIONS = None,
         **kwargs: t.Any,
     ) -> None:
-        self.enum_class = column.type.enum_class  # type: ignore[attr-defined]
+        self.enum_class = (
+            None if isinstance(column, str) else column.type.enum_class  # type: ignore[attr-defined]
+        )
         super().__init__(column, name, options, **kwargs)
+
+    def _on_column_resolved(self) -> None:
+        super()._on_column_resolved()
+        if self.enum_class is None:
+            self.enum_class = self.column.type.enum_class  # type: ignore[attr-defined]
 
     def clean(self, value: t.Any) -> t.Any:
         values = super().clean(value)
@@ -433,13 +508,20 @@ class EnumFilterInList(FilterInList):
 class EnumFilterNotInList(FilterNotInList):
     def __init__(
         self,
-        column: T_SQLALCHEMY_COLUMN,
+        column: t.Union[T_SQLALCHEMY_COLUMN, str],
         name: str,
         options: T_OPTIONS = None,
         **kwargs: t.Any,
     ) -> None:
-        self.enum_class = column.type.enum_class  # type: ignore[attr-defined]
+        self.enum_class = (
+            None if isinstance(column, str) else column.type.enum_class  # type: ignore[attr-defined]
+        )
         super().__init__(column, name, options, **kwargs)
+
+    def _on_column_resolved(self) -> None:
+        super()._on_column_resolved()
+        if self.enum_class is None:
+            self.enum_class = self.column.type.enum_class  # type: ignore[attr-defined]
 
     def clean(self, value: t.Any) -> t.Any:
         values = super().clean(value)
