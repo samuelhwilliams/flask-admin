@@ -1,6 +1,13 @@
 Changelog
 =========
 
+2.1.1 [unreleased]
+------------------
+
+New Features:
+* SQLAlchemy filter classes (``FilterEqual``, ``FilterLike``, etc.) now accept a dotted-path string for the ``column`` argument (e.g. ``FilterEqual(column="author.email", name="Author Email")``); the path is resolved against the view's model and the necessary joins are added automatically.
+
+
 2.1.0
 -----
 
