@@ -13,6 +13,7 @@ from flask_admin._types import T_WIDGET_TYPE
 from flask_admin.babel import lazy_gettext
 from flask_admin.contrib.sqla import tools
 from flask_admin.contrib.sqla._types import T_SQLALCHEMY_QUERY
+from flask_admin.contrib.sqla.tools import is_relationship
 from flask_admin.model import filters
 
 
@@ -118,6 +119,11 @@ class BaseSQLAFilter(filters.BaseFilter):
         if attr is None:
             raise ValueError(
                 f"Could not resolve filter path {path!r} on {model.__name__}"
+            )
+        if is_relationship(attr):
+            raise ValueError(
+                f"Cannot filter on relationship {path!r} on {model.__name__}; "
+                "use a real column instead."
             )
         self.key_name = path
         self.column = attr

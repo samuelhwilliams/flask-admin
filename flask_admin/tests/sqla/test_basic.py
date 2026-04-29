@@ -1880,6 +1880,23 @@ def test_column_filters_dotted_path_unresolvable(
             )
 
 
+def test_column_filters_dotted_path_relationship_raises(
+    app, sqla_db_ext, admin, session_or_db
+):
+    """A path that resolves to a relationship (not a column) is rejected."""
+    with app.app_context():
+        Model1, Model2 = create_models(sqla_db_ext)
+        param = skip_or_return_session_or_db(sqla_db_ext, session_or_db)
+
+        # `model1` on Model2 is the relationship itself, not a column.
+        flt = filters.FilterEqual(column="model1", name="Model1")
+
+        with pytest.raises(ValueError, match="Cannot filter on relationship"):
+            CustomModelView(
+                Model2, param, column_filters=[flt], endpoint="_dotted_path_rel"
+            )
+
+
 def test_column_filters_dotted_path_reuse_same_model(
     app, sqla_db_ext, admin, session_or_db
 ):
